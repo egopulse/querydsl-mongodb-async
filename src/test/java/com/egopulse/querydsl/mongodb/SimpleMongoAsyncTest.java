@@ -2,7 +2,6 @@ package com.egopulse.querydsl.mongodb;
 
 import com.egopulse.querydsl.mongodb.domain.User;
 import com.jayway.awaitility.Awaitility;
-import com.jayway.awaitility.Duration;
 import com.mongodb.DBObject;
 import com.mongodb.async.client.MongoClient;
 import com.mongodb.async.client.MongoClients;
@@ -28,8 +27,6 @@ import rx.Observable;
 import java.io.IOException;
 import java.util.Timer;
 import java.util.TimerTask;
-import java.util.concurrent.Delayed;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class SimpleMongoAsyncTest {

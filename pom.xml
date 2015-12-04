@@ -104,7 +104,7 @@
             </goals>
             <configuration>
               <outputDirectory>target/generated-test-sources/java</outputDirectory>
-              <processor>com.querydsl.apt.morphia.MorphiaAnnotationProcessor</processor>
+              <processor>com.egopulse.querydsl.mongodb.MongoAnnotationProcessor</processor>
               <logOnlyOnError>true</logOnlyOnError>
               <options>
                 <defaultOverwrite>true</defaultOverwrite>

@@ -1,1 +1,1 @@
-com.querydsl.apt.morphia.MorphiaAnnotationProcessor
+com.egopulse.querydsl.mongodb.MongoAnnotationProcessor
