@@ -1,9 +1,7 @@
 package com.egopulse.querydsl.mongodb;
 
 import com.egopulse.querydsl.mongodb.domain.QUser;
-import com.mongodb.async.client.MongoClient;
-import com.mongodb.async.client.MongoClients;
-import com.mongodb.async.client.MongoDatabase;
+import com.mongodb.async.client.MongoClientSettings;
 import com.querydsl.core.types.Expression;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import org.bson.Document;
@@ -14,21 +12,12 @@ import org.junit.Test;
 
 public class MongodbSerializerTest {
 
-    private final MongodbSerializer serializer;
-    private final MongoClient mongoClient;
-    private final MongoDatabase mongoDatabase;
-    private final CodecRegistry codecRegistry;
+    private final MongodbSerializer serializer = new MongodbSerializer();
+    private final CodecRegistry codecRegistry = MongoClientSettings.builder().build().getCodecRegistry();;
 
     BooleanExpression expression1 = QUser.user.firstName.eq("Random string");
     BooleanExpression expression2 = QUser.user.firstName.ne("Random string");
     BooleanExpression expression3 = QUser.user.age.gt(99);
-
-    public MongodbSerializerTest() {
-        this.mongoClient = MongoClients.create();
-        this.serializer = new MongodbSerializer();
-        this.mongoDatabase = mongoClient.getDatabase("test");
-        this.codecRegistry = mongoDatabase.getCodecRegistry();
-    }
 
     @Test
     public void simpleQuery() {
@@ -54,7 +43,7 @@ public class MongodbSerializerTest {
 
     protected String toJsonSearchString(Expression<?> expression) {
         Bson bson = (Bson) this.serializer.handle(expression);
-        return bson.toBsonDocument(Document.class, mongoDatabase.getCodecRegistry()).toJson(new JsonWriterSettings(true));
+        return bson.toBsonDocument(Document.class, codecRegistry).toJson(new JsonWriterSettings(true));
     }
 
 }

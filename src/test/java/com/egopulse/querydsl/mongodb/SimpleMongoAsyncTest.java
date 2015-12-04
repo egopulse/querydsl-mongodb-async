@@ -2,6 +2,7 @@ package com.egopulse.querydsl.mongodb;
 
 import com.egopulse.querydsl.mongodb.domain.User;
 import com.jayway.awaitility.Awaitility;
+import com.jayway.awaitility.Duration;
 import com.mongodb.DBObject;
 import com.mongodb.async.client.MongoClient;
 import com.mongodb.async.client.MongoClients;
@@ -25,6 +26,10 @@ import org.mongodb.morphia.Morphia;
 import rx.Observable;
 
 import java.io.IOException;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.concurrent.Delayed;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class SimpleMongoAsyncTest {
@@ -48,6 +53,18 @@ public class SimpleMongoAsyncTest {
                 .build();
         exe = MongodStarter.getDefaultInstance().prepare(config);
         mongoProcess = exe.start();
+
+        AtomicBoolean started = new AtomicBoolean(false);
+
+        new Timer().schedule(
+                new TimerTask() {
+                    @Override
+                    public void run() {
+                        started.set(true);
+                    }
+        }, 2000);
+
+        Awaitility.await().untilTrue(started);
 
         // Start mongo client
         client = MongoClients.create("mongodb://localhost:27018");
