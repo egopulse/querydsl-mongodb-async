@@ -11,7 +11,7 @@
 
   <properties>
     <mongodb.version>3.0.4</mongodb.version>
-    <mongo.async.version>3.0.4</mongo.async.version>
+    <mongo.async.version>3.1.0</mongo.async.version>
     <morphia.version>1.0.1</morphia.version>
     <querydsl.version>4.0.7</querydsl.version>
     <slf4j.version>1.6.1</slf4j.version>
@@ -20,8 +20,8 @@
   <dependencies>
     <dependency>
       <groupId>org.mongodb</groupId>
-      <artifactId>mongodb-driver-async</artifactId>
-      <version>${mongo.async.version}</version>
+      <artifactId>mongodb-driver-rx</artifactId>
+      <version>1.1.0</version>
     </dependency>
 
     <dependency>

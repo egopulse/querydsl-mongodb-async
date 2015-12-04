@@ -1,8 +1,6 @@
 package com.egopulse.querydsl.mongodb;
 
-import com.mongodb.BasicDBObject;
-import com.mongodb.async.client.FindIterable;
-import com.mongodb.async.client.MongoCollection;
+import com.mongodb.rx.client.MongoDatabase;
 import com.mysema.commons.lang.CloseableIterator;
 import com.querydsl.core.DefaultQueryMetadata;
 import com.querydsl.core.QueryMetadata;
@@ -13,24 +11,22 @@ import com.querydsl.core.types.*;
 import org.bson.BsonDocument;
 import org.bson.Document;
 import org.bson.conversions.Bson;
-import org.bson.json.JsonWriterSettings;
 import rx.Observable;
 
 import javax.annotation.Nullable;
-import java.util.ArrayList;
 import java.util.List;
 
 public abstract class AsyncMongoQuery<K, Q extends AsyncMongoQuery<K, Q>> implements SimpleQuery<Q>, Fetchable<K> {
 
     private final QueryMixin<Q> queryMixin;
-    private final MongoCollection<Document> collection;
     private final MongodbSerializer serializer;
+    private final MongoDatabase database;
 
-    public AsyncMongoQuery(MongoCollection<Document> collection) {
+    protected AsyncMongoQuery(MongoDatabase database) {
+        this.database = database;
         @SuppressWarnings("unchecked")
         Q query = (Q) this;
         this.queryMixin = new QueryMixin<Q>(query, new DefaultQueryMetadata(), false);
-        this.collection = collection;
         this.serializer = new MongodbSerializer();
     }
 
@@ -94,90 +90,39 @@ public abstract class AsyncMongoQuery<K, Q extends AsyncMongoQuery<K, Q>> implem
      * @param paths fields to return
      * @return results
      */
-    public Observable<List<K>> fetch(String collection, Path<?>... paths) {
+    public Observable<List<K>> fetchFrom(String collection, Path<?>... paths) {
         queryMixin.setProjection(paths);
-        return fetch(collection);
+        return fetchFrom(collection);
     }
 
     @Override
-    public Observable<List<K>> fetch() {
-        MongodbSerializer serializer = new MongodbSerializer();
-
+    public Observable<List<K>> fetchFrom(String collection) {
         QueryMetadata metadata = queryMixin.getMetadata();
+
         Predicate filterExpression = createFilter(metadata);
-
-
         Bson filterCondition = filterExpression == null ? new BsonDocument() : (Bson) serializer.handle(filterExpression);
+        Bson projection = createProjection(metadata.getProjection());
+        Bson sort = createSort(metadata.getOrderBy());
 
-        System.out.println(toJson(filterCondition));
-
-        return Observable.create(subscriber -> {
-            this.collection.find(filterCondition).into(new ArrayList<>(), (documents, throwable) -> {
-                if (throwable != null) {
-                    subscriber.onError(throwable);
-                } else {
-                    documents.stream().forEach((Document d) -> {
-                        System.out.println(d.toJson(new JsonWriterSettings(true)));
-                    });
-                    subscriber.onNext(null);
-                }
-
-                subscriber.onCompleted();
-            });
-        });
+        return this.database.getCollection(collection)
+                .find(filterCondition)
+                .projection(projection)
+                .sort(sort)
+                // TODO conversion here
+                .toObservable().map(doc -> {
+                    System.out.println(doc.toJson());
+                    return null;
+                });
     }
 
-    protected String toJson(Bson bson) {
-        return bson.toBsonDocument(Document.class, collection.getCodecRegistry()).toJson(new JsonWriterSettings(true));
-    }
-
-    public Observable<K> fetchOne(Path<?>... paths) {
+    public Observable<K> fetchOneFrom(String collection, Path<?>... paths) {
         queryMixin.setProjection(paths);
-        return fetchOne();
+        return fetchOneFrom(collection);
     }
 
     @Override
-    public Observable<K> fetchOne() {
-        return Observable.create(subscriber -> {
-            this.collection.find(new Document()).first((documents, throwable) -> {
-                if (throwable != null) {
-                    subscriber.onError(throwable);
-                } else {
-                    System.out.println(documents);
-                    subscriber.onNext(null);
-                }
-
-                subscriber.onCompleted();
-            });
-        });
-    }
-
-    private FindIterable<Document> rawFetch() {
-        QueryMetadata metadata = queryMixin.getMetadata();
-        Predicate filter = createFilter(metadata);
-
-        BasicDBObject dbObject = createQuery(filter);
-        Document document = new Document(dbObject);
-
-        return this.collection.find(document);
-    }
-
-//    private DBObject createProjection(Expression<?> projection) {
-//        if (projection instanceof FactoryExpression) {
-//            DBObject obj = new BasicDBObject();
-//            for (Object expr : ((FactoryExpression) projection).getArgs()) {
-//                if (expr instanceof Expression) {
-//                    obj.put((String) serializer.handle((Expression) expr), 1);
-//                }
-//            }
-//            return obj;
-//        }
-//        return null;
-//    }
-
-    private BasicDBObject createQuery(@Nullable Predicate predicate) {
-
-            return new BasicDBObject();
+    public Observable<K> fetchOneFrom(String collection) {
+        return this.database.getCollection(collection).find(new Document()).first().map(d -> null);
     }
 
     @SuppressWarnings("unchecked")
@@ -203,8 +148,24 @@ public abstract class AsyncMongoQuery<K, Q extends AsyncMongoQuery<K, Q>> implem
         return null;
     }
 
-    @Nullable
-    protected Predicate createFilter(QueryMetadata metadata) {
+    private Bson createSort(List<OrderSpecifier<?>> orderBys) {
+        return serializer.toSort(orderBys);
+    }
+
+    private Bson createProjection(Expression<?> projection) {
+        if (projection instanceof FactoryExpression) {
+            Document obj = new Document();
+            for (Object expr : ((FactoryExpression) projection).getArgs()) {
+                if (expr instanceof Expression) {
+                    obj.put((String) serializer.handle((Expression) expr), 1);
+                }
+            }
+            return obj;
+        }
+        return null;
+    }
+
+    private Predicate createFilter(QueryMetadata metadata) {
         Predicate filter;
         if (!metadata.getJoins().isEmpty()) {
             filter = ExpressionUtils.allOf(metadata.getWhere(), createJoinFilter(metadata));

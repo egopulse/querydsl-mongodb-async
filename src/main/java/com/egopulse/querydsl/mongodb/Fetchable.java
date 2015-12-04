@@ -6,11 +6,11 @@ import rx.Observable;
 import java.util.List;
 
 public interface Fetchable<T> {
-    Observable<List<T>> fetch();
+    Observable<List<T>> fetchFrom(String collection);
 
 //    Observable<T> fetchFirst(String collection);
 
-    Observable<T> fetchOne();
+    Observable<T> fetchOneFrom(String collection);
 
 //    QueryResults<T> fetchResults(String collection);
 

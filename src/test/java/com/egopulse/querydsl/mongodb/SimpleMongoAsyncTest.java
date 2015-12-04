@@ -3,11 +3,11 @@ package com.egopulse.querydsl.mongodb;
 import com.egopulse.querydsl.mongodb.domain.User;
 import com.jayway.awaitility.Awaitility;
 import com.mongodb.DBObject;
-import com.mongodb.async.client.MongoClient;
-import com.mongodb.async.client.MongoClients;
-import com.mongodb.async.client.MongoCollection;
-import com.mongodb.async.client.MongoDatabase;
 import com.egopulse.querydsl.mongodb.domain.QUser;
+import com.mongodb.rx.client.MongoClient;
+import com.mongodb.rx.client.MongoClients;
+import com.mongodb.rx.client.MongoCollection;
+import com.mongodb.rx.client.MongoDatabase;
 import de.flapdoodle.embed.mongo.MongodExecutable;
 import de.flapdoodle.embed.mongo.MongodProcess;
 import de.flapdoodle.embed.mongo.MongodStarter;
@@ -23,6 +23,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.mongodb.morphia.Morphia;
 import rx.Observable;
+import rx.Single;
 
 import java.io.IOException;
 import java.util.Timer;
@@ -42,6 +43,8 @@ public class SimpleMongoAsyncTest {
 
     private Morphia morphia;
 
+    private static final String COLLECTION_NAME = "user";
+
     public SimpleMongoAsyncTest() throws IOException {
         // Start embeded mongo
         config = new MongodConfigBuilder()
@@ -53,32 +56,22 @@ public class SimpleMongoAsyncTest {
 
         AtomicBoolean started = new AtomicBoolean(false);
 
-        new Timer().schedule(
-                new TimerTask() {
-                    @Override
-                    public void run() {
-                        started.set(true);
-                    }
-        }, 2000);
-
-        Awaitility.await().untilTrue(started);
-
         // Start mongo client
         client = MongoClients.create("mongodb://localhost:27018");
         database = client.getDatabase("test");
-        collection = database.getCollection("user");
+        collection = database.getCollection(COLLECTION_NAME);
 
         morphia = new Morphia().mapPackage("com.querydsl.mongodb.domain");
     }
 
     @After
     public void cleanSh1t() {
+        AtomicBoolean finished = new AtomicBoolean(false);
         // Delete every single thing
-        collection.deleteMany(new BsonDocument(), (deleteResult, throwable) -> {
-            if (throwable != null) {
-                System.err.println(throwable.getMessage());
-            }
+        collection.deleteMany(new BsonDocument()).subscribe(__ -> {
+            finished.set(true);
         });
+        Awaitility.await().untilTrue(finished);
     }
 
     @Before
@@ -103,14 +96,14 @@ public class SimpleMongoAsyncTest {
     public void simpleTest() {
         AtomicBoolean finished = new AtomicBoolean(false);
 
-        UserMongoQuery query = new UserMongoQuery(collection);
+        MongoQuery query = MongoQuery.forDatabase(database);
 
-        query.fetch().subscribe(__ -> {
+        query.fetchFrom(COLLECTION_NAME).subscribe(__ -> {
             System.out.println("I am here");
         });
 
         query.where(QUser.user.firstName.startsWith("J").and(QUser.user.lastName.startsWith("J")))
-                .fetch()
+                .fetchFrom(COLLECTION_NAME, QUser.user.firstName, QUser.user.lastName)
                 .subscribe(users -> {
                     finished.set(true);
                 });
@@ -124,18 +117,10 @@ public class SimpleMongoAsyncTest {
         DBObject dbObject = morphia.getMapper().toDBObject(user);
         Document document = new Document(dbObject.toMap());
 
-        return Observable.create(subscriber -> {
-            collection.insertOne(document, (__, throwable) -> {
-                if (throwable != null) {
-                    subscriber.onError(throwable);
-                } else {
-                    subscriber.onNext(user);
-                }
-
-                subscriber.onCompleted();
-            });
-        });
-
+        return collection.insertOne(document)
+                .map(__ -> user)
+                .toSingle()
+                .toObservable();
     }
 
 }

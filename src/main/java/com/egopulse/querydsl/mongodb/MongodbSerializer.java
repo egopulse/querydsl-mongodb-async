@@ -14,10 +14,13 @@
 package com.egopulse.querydsl.mongodb;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Sorts;
 import org.bson.*;
 import org.bson.conversions.Bson;
 import com.mongodb.BasicDBObject;
@@ -37,13 +40,16 @@ public class MongodbSerializer implements Visitor<Object, Void> {
         return expression.accept(this, null);
     }
 
-    public BasicDBObject toSort(List<OrderSpecifier<?>> orderBys) {
-        BasicDBObject sort = new BasicDBObject();
-        for (OrderSpecifier<?> orderBy : orderBys) {
-            Object key = orderBy.getTarget().accept(this, null);
-            sort.append(key.toString(), orderBy.getOrder() == Order.ASC ? 1 : -1);
-        }
-        return sort;
+    public Bson toSort(List<OrderSpecifier<?>> orderBys) {
+        List<Bson> bsons = orderBys.stream()
+                .map(orderBy -> {
+                    Object key = orderBy.getTarget().accept(this, null);
+                    return orderBy.getOrder() == Order.ASC
+                            ? Sorts.ascending((String) key)
+                            : Sorts.descending((String) key);
+                })
+                .collect(Collectors.toList());
+        return Sorts.orderBy(bsons);
     }
 
     @Override
